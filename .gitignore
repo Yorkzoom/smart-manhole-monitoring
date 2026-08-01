@@ -1,0 +1,21 @@
+# 依赖与构建产物
+node_modules/
+dist/
+server/client/dist/
+
+# 运行数据与密钥
+server/data/
+server/.env
+*.log
+
+# 临时/备份文件
+*.bak*
+~$*
+工具软件/
+docs/test.docx
+docs/test_temp.docx
+docs/~$*.docx
+
+# IDE
+.vscode/
+.idea/

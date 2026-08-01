@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>???? ? ????</title>
+<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Microsoft YaHei',sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh;padding:20px}
+.container{max-width:800px;margin:0 auto}
+.header{text-align:center;padding:20px 0 10px}
+.header h1{font-size:22px;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header p{font-size:12px;color:#888;margin-top:4px}
+.status{text-align:center;padding:8px;margin:10px 0;border-radius:8px;font-size:13px}
+.status.connected{background:#1a3a1a;color:#4caf50}
+.status.disconnected{background:#3a1a1a;color:#f44336}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.card{background:#1a1a2e;border-radius:10px;padding:16px;text-align:center;border:1px solid #2a2a4a}
+.card .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px}
+.card .value{font-size:28px;font-weight:700;margin:8px 0 2px}
+.card .unit{font-size:13px;color:#666}
+.card .time{font-size:10px;color:#555;margin-top:6px}
+.card.temp .value{color:#ff6b6b}
+.card.hum .value{color:#4fc3f7}
+.card.tilt .value{color:#ffd54f}
+.card.light .value{color:#ffb74d}
+.card.mq2 .value{color:#ce93d8}
+.card.mq4 .value{color:#81c784}
+@media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.card .value{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>?? ????????</h1>
+<p>ESP32 ? MQTT ? ????</p>
+</div>
+<div id="statusBar" class="status disconnected">? ???? MQTT...</div>
+<div class="grid" id="cardGrid"></div>
+</div>
+<script>
+const BROKER = "broker.emqx.io";
+const WS_PORT = 8084;
+const TOPIC = "manhole/esp32_001/data";
+
+const cards = [
+  {id:"temp", label:"??", icon:"??", unit:"?C", cls:"temp"},
+  {id:"hum", label:"??", icon:"??", unit:"%", cls:"hum"},
+  {id:"tilt", label:"??", icon:"??", unit:"?", cls:"tilt"},
+  {id:"light", label:"??", icon:"?", unit:"lux", cls:"light"},
+  {id:"mq2", label:"MQ-2 ????", icon:"??", unit:"", cls:"mq2"},
+  {id:"mq4", label:"MQ-4 ??", icon:"?", unit:"", cls:"mq4"},
+];
+
+function buildCards() {
+  const grid = document.getElementById("cardGrid");
+  grid.innerHTML = cards.map(c => `
+    <div class="card ${c.cls}" id="card-${c.id}">
+      <div class="label">${c.icon} ${c.label}</div>
+      <div class="value">--</div>
+      <div class="unit">${c.unit}</div>
+      <div class="time"></div>
+    </div>
+  `).join("");
+}
+
+function updateCard(id, value, time) {
+  const el = document.querySelector(`#card-${id} .value`);
+  const te = document.querySelector(`#card-${id} .time`);
+  if(el) el.textContent = value;
+  if(te) te.textContent = time;
+}
+
+buildCards();
+
+const client = mqtt.connect(`ws://${BROKER}:${WS_PORT}/mqtt`, {
+  clientId: "manhole_viewer_" + Math.random().toString(36).slice(2,8),
+  clean: true,
+});
+
+const statusBar = document.getElementById("statusBar");
+
+client.on("connect", () => {
+  statusBar.className = "status connected";
+  statusBar.textContent = "? ??? MQTT?????...";
+  client.subscribe(TOPIC, {qos:1});
+});
+
+client.on("message", (topic, payload) => {
+  try {
+    const d = JSON.parse(payload.toString());
+    const now = new Date().toLocaleTimeString("zh-CN", {hour12:false});
+
+    statusBar.className = "status connected";
+    statusBar.textContent = `? ????? | ??: ${now}`;
+
+    updateCard("temp", d.temperature?.toFixed(1) ?? "--", now);
+    updateCard("hum", d.humidity ?? "--", now);
+    updateCard("tilt", d.tilt_angle?.toFixed(1) ?? "--", now);
+    updateCard("light", d.light ?? "--", now);
+    updateCard("mq2", d.mq2 ?? "--", now);
+    updateCard("mq4", d.mq4 ?? "--", now);
+  } catch(e) {}
+});
+
+client.on("error", (err) => {
+  statusBar.className = "status disconnected";
+  statusBar.textContent = "? MQTT ??: " + err.message;
+});
+
+client.on("close", () => {
+  statusBar.className = "status disconnected";
+  statusBar.textContent = "? MQTT ????????...";
+});
+</script>
+</body>
+</html>
